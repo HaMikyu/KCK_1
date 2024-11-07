@@ -56,7 +56,7 @@ class Controller:
             with open('config.json', 'r') as f:
                 self.config = json.load(f)
         except:
-            raise FileException('config.json has problems!')
+            raise FileNotFoundError('config.json has problems!')
 
         if not os.path.isfile("clock.wav"):
             raise FileNotFoundError("I guess you don't have clock.wav?")
