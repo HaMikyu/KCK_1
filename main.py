@@ -381,7 +381,7 @@ def view_settings(stdscr, controller):
 def edit_settings(stdscr, controller):
     stdscr.clear()
     stdscr.addstr(0, 0, "Edit Settings (Use arrow keys to navigate, Enter to edit, Escape to exit):")
-    curses.curs_set(1)
+
 
     keys = list(controller.config.keys())
     current_edit = 0
@@ -417,12 +417,14 @@ def edit_settings(stdscr, controller):
             key = ""
 
         if key == '\n' and not editing:
+            curses.curs_set(1)
             current_input = str(controller.config[keys[current_edit]])
             editing = True
         elif key == '\n' and editing:
             controller.config[keys[current_edit]] = current_input
             current_input = ""
             editing = False
+            curses.curs_set(0)
         elif key == '\x1b':
             break
         elif key == '\b':
