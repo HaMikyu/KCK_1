@@ -392,6 +392,8 @@ def view_settings(stdscr, controller):
             key = stdscr.getkey()
         except curses.error:
             key = ''
+import curses
+
 def edit_settings(stdscr, controller):
     curses.start_color()
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
@@ -436,9 +438,12 @@ def edit_settings(stdscr, controller):
             key = ""
 
         if key == '\n' and not editing:
-            curses.curs_set(1)
-            current_input = str(controller.config[keys[current_edit]])
-            editing = True
+            if isinstance(controller.config[keys[current_edit]], bool):
+                controller.config[keys[current_edit]] = not controller.config[keys[current_edit]]
+            else:
+                curses.curs_set(1)
+                current_input = str(controller.config[keys[current_edit]])
+                editing = True
         elif key == '\n' and editing:
             controller.config[keys[current_edit]] = current_input
             current_input = ""
@@ -453,9 +458,13 @@ def edit_settings(stdscr, controller):
         elif key == '\b':
             if current_input:
                 current_input = current_input[:-1]
+        elif key == ' ' and editing and isinstance(controller.config[keys[current_edit]], bool):
+            controller.config[keys[current_edit]] = not controller.config[keys[current_edit]]
         elif key.isprintable() and editing:
             current_input += key
+
     curses.curs_set(0)
+
 
 def main():
     controller = Controller()
