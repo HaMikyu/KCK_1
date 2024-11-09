@@ -7,7 +7,6 @@ from pynput import keyboard, mouse
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import curses
-import simpleaudio as sa
 from pygetwindow import getAllTitles as getAllWindows
 from screeninfo import get_monitors
 from pyautogui import click
@@ -17,18 +16,13 @@ from unidecode import unidecode
 from timeit import default_timer as timer
 import xlsxwriter
 
-def play_sound_in_background():
-    filename = 'clock.wav'
-    wave_obj = sa.WaveObject.from_wave_file(filename)
-    play_obj = wave_obj.play()
-    play_obj.wait_done()
-
 class Controller:
     def __init__(self):
         self.config = {
             'program': 'notepad.exe',
             'title': 'Notatnik',
             'path': os.path.dirname(os.path.realpath(__file__)) + r'\ruchy',
+            'key':'key.home',
             'monitor': 1,
             'first_person_view': False,
             'record_screen': False,
@@ -40,7 +34,7 @@ class Controller:
         }
         self.load_json()
         self.set_variables()
-
+        self.main_ui=True
     def set_variables(self):
         self.config['path'] = self.config['path'].strip()
         self.config['width'] = get_monitors()[self.config['monitor'] - 1].width
@@ -90,10 +84,12 @@ class Program:
         self.height = get_monitors()[self.monitor - 1].height
         self.middle_x = self.width / 2
         self.middle_y = self.height / 2
-        self.stdscr.addstr(0, 0, f"You can run your program now!")
+        self.stdscr.addstr(0, 0, f"You can run your program now!\n", curses.A_REVERSE)
         self.stdscr.refresh()
 
     def start(self):
+        if os.path.isdir(self.controller.config['path'])==False:
+            os.mkdir(self.controller.config['path'])
         folder_contents = os.listdir(self.controller.config['path'])
         max_index = 0
         try:
@@ -117,8 +113,9 @@ class Program:
         self.worksheet.write(f'D1', "LeftMouseButton")
         self.worksheet.write(f'E1', "RightMouseButton")
         self.worksheet.write(f'F1', "Keys")
-
-        print(f"WAITING FOR {self.controller.config['program'][:-4]}")
+        self.stdscr.addstr(1, 0, f"Waiting for {self.controller.config['program'][:-4]}...\n")
+        self.stdscr.refresh()
+        #print()
         lock = True
         while lock:
             if self.process_exists(True):
@@ -132,8 +129,10 @@ class Program:
             else:
                 self.controller.config['title'] = result
                 lock = False
-        print(f"WINDOW TITLE '{result}'")
-
+        #print()
+        self.stdscr.addstr(2, 0, f"Found '{result}'!\n")
+        self.stdscr.addstr(3, 0, f"Countdown...")
+        self.stdscr.refresh()
         self.countdown()
 
     def countdown(self):
@@ -167,16 +166,20 @@ class Program:
         key_str = format(key)
         key_str = key_str.lower().strip()
 
+        # sometimes weird characters appear
         if key_str.startswith(r"\\"):
             return
 
+        key_str = key_str.replace("'","")
+        print(key_str)
         if len(key_str) == 3:
             key_str = key_str[1:-1]
         key_str = unidecode(key_str)
 
         if key_str in ['#', '@']:
             return
-        if 'home' in key_str:
+
+        if self.config['key'] in key_str:
             self.stop_recording()
             return
 
@@ -231,7 +234,8 @@ class Program:
             try:
                 if process_name[:-4].lower() in proc.name().lower():
                     if print_msg:
-                        print(f"DETECTED {process_name[:-4]}")
+                        pass
+                        #print(f"DETECTED {process_name[:-4]}")
                     return True
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
@@ -265,7 +269,7 @@ class Program:
         def on_frame_arrived(frame: Frame, capture_control: InternalCaptureControl):
             if not self.is_running:
                 if not self.iHaveWorked:
-                    print("Stopping recording")
+                    #print("Stopping recording")
                     self.iHaveWorked = True
                     capture_control.stop()
                 return
@@ -322,29 +326,35 @@ class Program:
         self.is_running = False
         self.listener_m.stop()
         self.listener_k.stop()
-
+        self.controller.main_ui = True
 
 def main_ui(stdscr, controller):
     curses.curs_set(0)
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     stdscr.clear()
     options = ['View Current Settings', 'Edit Settings', 'Start Recording', 'Save and Exit']
     current_option = 0
 
     while True:
+        if controller.main_ui==False:
+            continue
         stdscr.clear()
         stdscr.addstr(0, 0, "Select an Option:")
 
         for idx, option in enumerate(options):
             if idx == current_option:
-                stdscr.addstr(idx + 2, 0, f"> {option}", curses.A_REVERSE)
+                stdscr.addstr(idx + 2, 0, f"> {option.capitalize()}", curses.color_pair(1))
             else:
-                stdscr.addstr(idx + 2, 0, f"  {option}")
+                stdscr.addstr(idx + 2, 0, f"  {option.capitalize()}")
 
         stdscr.addstr(len(options) + 2, 0, "Press 'Escape' to exit the menu without saving.")
 
         stdscr.refresh()
-
-        key = stdscr.getkey()
+        try:
+            key = stdscr.getkey()
+        except curses.error:
+            key = ''
 
         if key == 'KEY_DOWN' and current_option < len(options) - 1:
             current_option += 1
@@ -357,61 +367,113 @@ def main_ui(stdscr, controller):
                 edit_settings(stdscr, controller)
             elif current_option == 2:
                 stdscr.clear()
-                curses.endwin()
+                controller.main_ui = False
                 program = Program(controller, stdscr)
                 program.start()
-                break
+                curses.endwin()
             elif current_option == 3:
                 controller.save_json()
                 curses.endwin()
                 break
         elif key == '\x1b':
             curses.endwin()
-            break
+            exit()
 
 
 def view_settings(stdscr, controller):
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     stdscr.clear()
     stdscr.addstr(0, 0, "Current Settings:")
     for idx, (key, value) in enumerate(controller.config.items()):
-        stdscr.addstr(idx + 1, 0, f"{key}: {value}")
+        stdscr.addstr(idx + 1, 0, f"{key.capitalize()}: {value}")
     stdscr.addstr(len(controller.config) + 2, 0, "Press any key to return to menu.")
     stdscr.refresh()
-    stdscr.getkey()
+    key=''
+    while key =='':
+        try:
+            key = stdscr.getkey()
+        except curses.error:
+            key = ''
+import curses
+
 def edit_settings(stdscr, controller):
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     stdscr.clear()
     stdscr.addstr(0, 0, "Edit Settings (Use arrow keys to navigate, Enter to edit, Escape to exit):")
-
-
     keys = list(controller.config.keys())
     current_edit = 0
+    current_subedit = 0
     current_input = ""
+    current_submenu=""
     editing = False
+    sub_menu=False
+    photo_formats=['png','jpg','jpeg']
+    bools=['true','false']
 
     while True:
         stdscr.clear()
         stdscr.addstr(0, 0, "Edit Settings (Use arrow keys to navigate, Enter to edit, Escape to exit):")
 
         for idx, key in enumerate(keys):
-            if idx == current_edit:
-                stdscr.addstr(idx + 1, 0, f"-> {key}: {controller.config[key]}", curses.A_REVERSE)
+            if idx == current_edit % len(keys):
+                stdscr.addstr(idx + 1, 0, f"-> {key.capitalize()}: {controller.config[key]}", curses.color_pair(1))
             else:
-                stdscr.addstr(idx + 1, 0, f"  {key}: {controller.config[key]}")
+                stdscr.addstr(idx + 1, 0, f"  {key.capitalize()}: {controller.config[key]}")
 
         if editing:
-            stdscr.addstr(len(keys) + 2, 0, f"Current input: {current_input}")
-            stdscr.move(len(keys) + 2, len(f"Current input: {current_input}"))
+            if current_input.lower() in bools:
+                curses.curs_set(0)
+                sub_menu=True
+                if current_subedit==-1:
+                    current_subedit=bools.index(current_input.lower())
+                for x1 in range(1,len(bools)+1):
+                    if x1-1 == current_subedit % len(bools):
+                        stdscr.addstr(x1+ 2+len(keys), 0, f"-> {bools[x1-1].capitalize()}",
+                                      curses.color_pair(1))
+                        current_submenu = bools[x1-1].lower() =='true'
+                    else:
+                        stdscr.addstr(x1+ 2+len(keys), 0, f"{bools[x1-1].capitalize()}")
+
+            elif current_input.lower() in photo_formats:
+                curses.curs_set(0)
+                sub_menu = True
+                if current_subedit == -1:
+                    current_subedit = photo_formats.index(current_input.lower())
+                for x1 in range(1, len(photo_formats) + 1):
+                    if x1 - 1 == current_subedit % len(photo_formats):
+                        stdscr.addstr(x1 + 2 + len(keys), 0, f"-> {photo_formats[x1 - 1]}",
+                                      curses.color_pair(1))
+                        current_submenu = photo_formats[x1 - 1].lower()
+                    else:
+                        stdscr.addstr(x1 + 2 + len(keys), 0, f"{photo_formats[x1 - 1]}")
+            else:
+                stdscr.addstr(len(keys) + 2, 0, f"Current input: {current_input}")
+                stdscr.move(len(keys) + 2, len(f"Current input: {current_input}"))
 
         stdscr.refresh()
 
-        key = stdscr.getkey()
+        try:
+            key = stdscr.getkey()
+        except curses.error:
+            key = ''
 
-        if key == 'KEY_DOWN' and current_edit < len(keys) - 1:
-            current_edit += 1
-            editing = False
-        elif key == 'KEY_UP' and current_edit > 0:
-            current_edit -= 1
-            editing = False
+        if key == 'KEY_DOWN':
+            curses.curs_set(0)
+            if not sub_menu:
+                editing = False
+                current_edit += 1
+            else:
+                current_subedit += 1
+
+        elif key == 'KEY_UP':
+            curses.curs_set(0)
+            if not sub_menu:
+                editing = False
+                current_edit -= 1
+            else:
+                current_subedit -= 1
 
         if "KEY_" in key:
             key = ""
@@ -420,19 +482,35 @@ def edit_settings(stdscr, controller):
             curses.curs_set(1)
             current_input = str(controller.config[keys[current_edit]])
             editing = True
+            current_subedit = -1
         elif key == '\n' and editing:
-            controller.config[keys[current_edit]] = current_input
+            if not sub_menu:
+                controller.config[keys[current_edit]] = current_input
+            else:
+                controller.config[keys[current_edit]] = current_submenu
             current_input = ""
             editing = False
+            sub_menu = False
             curses.curs_set(0)
         elif key == '\x1b':
-            break
+            if editing:
+                curses.curs_set(0)
+                editing = False
+                sub_menu = False
+            else:
+                break
         elif key == '\b':
-            if current_input:
+            if current_input and not sub_menu:
                 current_input = current_input[:-1]
         elif key.isprintable() and editing:
             current_input += key
 
-if __name__ == "__main__":
+    curses.curs_set(0)
+
+
+def main():
     controller = Controller()
     curses.wrapper(main_ui, controller)
+
+if __name__ == "__main__":
+    main()
