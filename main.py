@@ -7,7 +7,6 @@ from pynput import keyboard, mouse
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import curses
-import simpleaudio as sa
 from pygetwindow import getAllTitles as getAllWindows
 from screeninfo import get_monitors
 from pyautogui import click
@@ -16,6 +15,19 @@ import cv2
 from unidecode import unidecode
 from timeit import default_timer as timer
 import xlsxwriter
+import requests
+
+def download_file_from_google_drive(file_id, destination):
+    URL = "https://drive.google.com/uc?export=download"
+    session = requests.Session()
+    response = session.get(URL, params={'id': file_id}, stream=True)
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            response = session.get(URL, params={'id': file_id, 'confirm': value}, stream=True)
+    with open(destination, 'wb') as f:
+        for chunk in response.iter_content(1024):
+            if chunk:
+                f.write(chunk)
 
 class Controller:
     def __init__(self):
@@ -23,6 +35,7 @@ class Controller:
             'program': 'notepad.exe',
             'title': 'Notatnik',
             'path': os.path.dirname(os.path.realpath(__file__)) + r'\ruchy',
+            'key':'key.home',
             'monitor': 1,
             'first_person_view': False,
             'record_screen': False,
@@ -53,7 +66,11 @@ class Controller:
             raise FileNotFoundError('config.json has problems!')
 
         if not os.path.isfile("clock.wav"):
-            raise FileNotFoundError("I guess you don't have clock.wav?")
+            try:
+                download_file_from_google_drive("1xcBbdgl9pfl0ME0Gp7hrlp0rlomCN2TX",'clock.wav')
+            except:
+                raise Exception("'clock.wav' doesn't exist and can't be downloaded!")
+            #raise FileNotFoundError("I guess you don't have clock.wav?")
 
     def save_json(self):
         with open('config.json', 'w') as f:
@@ -166,16 +183,20 @@ class Program:
         key_str = format(key)
         key_str = key_str.lower().strip()
 
+        # sometimes weird characters appear
         if key_str.startswith(r"\\"):
             return
 
+        key_str = key_str.replace("'","")
+        print(key_str)
         if len(key_str) == 3:
             key_str = key_str[1:-1]
         key_str = unidecode(key_str)
 
         if key_str in ['#', '@']:
             return
-        if 'home' in key_str:
+
+        if self.config['key'] in key_str:
             self.stop_recording()
             return
 
@@ -363,7 +384,6 @@ def main_ui(stdscr, controller):
                 edit_settings(stdscr, controller)
             elif current_option == 2:
                 stdscr.clear()
-                #curses.endwin()
                 controller.main_ui = False
                 program = Program(controller, stdscr)
                 program.start()
@@ -401,66 +421,137 @@ def edit_settings(stdscr, controller):
     stdscr.addstr(0, 0, "Edit Settings (Use arrow keys to navigate, Enter to edit, Escape to exit):")
     keys = list(controller.config.keys())
     current_edit = 0
+    current_subedit = 0
     current_input = ""
+    current_submenu=""
     editing = False
+    sub_menu=False
+    photo_formats=['png','jpg','jpeg']
+    bools=['true','false']
+
+    def on_press(key):
+        nonlocal current_input, editing
+        print(key)
+        key_str = format(key)
+        key_str = key_str.lower().strip()
+
+        # sometimes weird characters appear
+        if key_str.startswith(r"\\"):
+            return
+
+        key_str = key_str.replace("'", "")
+        print(key_str)
+        if len(key_str) == 3:
+            key_str = key_str[1:-1]
+        key_str = unidecode(key_str)
+
+        if key_str in ['#', '@']:
+            return
+
+        current_input = key_str
+        controller.config[keys[current_edit]] = key_str
+        editing=False
+        curses.curs_set(0)
+        return False
 
     while True:
         stdscr.clear()
         stdscr.addstr(0, 0, "Edit Settings (Use arrow keys to navigate, Enter to edit, Escape to exit):")
 
         for idx, key in enumerate(keys):
-            if idx == current_edit:
+            if idx == current_edit % len(keys):
                 stdscr.addstr(idx + 1, 0, f"-> {key.capitalize()}: {controller.config[key]}", curses.color_pair(1))
             else:
                 stdscr.addstr(idx + 1, 0, f"  {key.capitalize()}: {controller.config[key]}")
 
         if editing:
-            stdscr.addstr(len(keys) + 2, 0, f"Current input: {current_input}")
-            stdscr.move(len(keys) + 2, len(f"Current input: {current_input}"))
+            if current_input.lower() in bools:
+                curses.curs_set(0)
+                sub_menu=True
+                if current_subedit==-1:
+                    current_subedit=bools.index(current_input.lower())
+                for x1 in range(1,len(bools)+1):
+                    if x1-1 == current_subedit % len(bools):
+                        stdscr.addstr(x1+ 1+len(keys), 0, f"-> {bools[x1-1].capitalize()}",
+                                      curses.color_pair(1))
+                        current_submenu = bools[x1-1].lower() =='true'
+                    else:
+                        stdscr.addstr(x1+ 1+len(keys), 0, f"{bools[x1-1].capitalize()}")
+
+            elif current_input.lower() in photo_formats:
+                curses.curs_set(0)
+                sub_menu = True
+                if current_subedit == -1:
+                    current_subedit = photo_formats.index(current_input.lower())
+                for x1 in range(1, len(photo_formats) + 1):
+                    if x1 - 1 == current_subedit % len(photo_formats):
+                        stdscr.addstr(x1 + 1 + len(keys), 0, f"-> {photo_formats[x1 - 1]}",
+                                      curses.color_pair(1))
+                        current_submenu = photo_formats[x1 - 1].lower()
+                    else:
+                        stdscr.addstr(x1 + 1 + len(keys), 0, f"{photo_formats[x1 - 1]}")
+            elif keys[current_edit]=='key':
+                stdscr.addstr(len(keys) + 2, 0, f"Press a new button: {current_input}")
+            else:
+                stdscr.addstr(len(keys) + 2, 0, f"Current input: {current_input}")
+                stdscr.move(len(keys) + 2, len(f"Current input: {current_input}"))
 
         stdscr.refresh()
 
-        try:
-            key = stdscr.getkey()
-        except curses.error:
-            key = ''
+        if editing and keys[current_edit] == 'key':
+            with keyboard.Listener(
+                    on_press=on_press) as listener:
+                listener.join()
+        else:
+            try:
+                key = stdscr.getkey()
+            except curses.error:
+                key = ''
 
-        if key == 'KEY_DOWN' and current_edit < len(keys) - 1:
+        if key == 'KEY_DOWN':
             curses.curs_set(0)
-            current_edit += 1
-            editing = False
-        elif key == 'KEY_UP' and current_edit > 0:
+            if not sub_menu:
+                editing = False
+                current_edit += 1
+            else:
+                current_subedit += 1
+
+        elif key == 'KEY_UP':
             curses.curs_set(0)
-            current_edit -= 1
-            editing = False
+            if not sub_menu:
+                editing = False
+                current_edit -= 1
+            else:
+                current_subedit -= 1
 
         if "KEY_" in key:
             key = ""
 
         if key == '\n' and not editing:
-            if isinstance(controller.config[keys[current_edit]], bool):
-                controller.config[keys[current_edit]] = not controller.config[keys[current_edit]]
-            else:
-                curses.curs_set(1)
-                current_input = str(controller.config[keys[current_edit]])
-                editing = True
+            curses.curs_set(1)
+            current_input = str(controller.config[keys[current_edit]])
+            editing = True
+            current_subedit = -1
         elif key == '\n' and editing:
-            controller.config[keys[current_edit]] = current_input
+            if not sub_menu:
+                controller.config[keys[current_edit]] = current_input
+            else:
+                controller.config[keys[current_edit]] = current_submenu
             current_input = ""
             editing = False
+            sub_menu = False
             curses.curs_set(0)
         elif key == '\x1b':
             if editing:
                 curses.curs_set(0)
                 editing = False
+                sub_menu = False
             else:
                 break
         elif key == '\b':
-            if current_input:
+            if current_input and not sub_menu:
                 current_input = current_input[:-1]
-        elif key == ' ' and editing and isinstance(controller.config[keys[current_edit]], bool):
-            controller.config[keys[current_edit]] = not controller.config[keys[current_edit]]
-        elif key.isprintable() and editing:
+        elif key.isprintable() and editing and keys[current_edit] != 'key':
             current_input += key
 
     curses.curs_set(0)
