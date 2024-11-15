@@ -48,12 +48,11 @@ class Controller:
         self.load_json()
         self.set_variables()
         self.main_ui=True
+        self.found_title=""
     def set_variables(self):
         self.config['path'] = self.config['path'].strip()
         self.config['width'] = get_monitors()[self.config['monitor'] - 1].width
         self.config['height'] = get_monitors()[self.config['monitor'] - 1].height
-        self.config['middle_x'] = int(self.config['width'] / 2)
-        self.config['middle_y'] = int(self.config['height'] / 2)
 
     def load_json(self):
         if not os.path.isfile('config.json'):
@@ -144,7 +143,7 @@ class Program:
             if result is None:
                 pass
             else:
-                self.controller.config['title'] = result
+                self.found_title = result
                 lock = False
         #print()
         self.stdscr.addstr(2, 0, f"Found '{result}'!\n")
@@ -166,11 +165,11 @@ class Program:
         self.mouse_thread = threading.Thread(target=self.mouse_listener)
         self.mouse_thread.start()
 
-        self.record(self.controller.config['title'])
+        self.record(self.found_title)
 
     def update_ui_loop(self):
         self.stdscr.clear()
-        self.stdscr.addstr(0, 0, f"Recording Program - {self.controller.config['title']}")
+        self.stdscr.addstr(0, 0, f"Recording Program - {self.found_title}")
         self.stdscr.addstr(2, 0, f"Mouse Position: ({int(self.x)}, {int(self.y)})")
         self.stdscr.addstr(3, 0, f"Left Mouse Button: {'Pressed' if self.left_button else 'Released'}")
         self.stdscr.addstr(4, 0, f"Right Mouse Button: {'Pressed' if self.right_button else 'Released'}")
@@ -188,7 +187,6 @@ class Program:
             return
 
         key_str = key_str.replace("'","")
-        print(key_str)
         if len(key_str) == 3:
             key_str = key_str[1:-1]
         key_str = unidecode(key_str)
@@ -491,6 +489,7 @@ def edit_settings(stdscr, controller):
                     else:
                         stdscr.addstr(x1 + 1 + len(keys), 0, f"{photo_formats[x1 - 1]}")
             elif keys[current_edit]=='key':
+                curses.curs_set(0)
                 stdscr.addstr(len(keys) + 2, 0, f"Press a new button: {current_input}")
             else:
                 stdscr.addstr(len(keys) + 2, 0, f"Current input: {current_input}")
