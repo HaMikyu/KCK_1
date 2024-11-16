@@ -16,6 +16,7 @@ from unidecode import unidecode
 from timeit import default_timer as timer
 import xlsxwriter
 import requests
+from main2 import CodeBrowser
 
 def download_file_from_google_drive(file_id, destination):
     URL = "https://drive.google.com/uc?export=download"
@@ -348,7 +349,7 @@ def main_ui(stdscr, controller):
     curses.start_color()
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     stdscr.clear()
-    options = ['View Current Settings', 'Edit Settings', 'Start Recording', 'Save and Exit']
+    options = ['View Current Settings', 'Edit Settings', 'Start Recording', 'Search directory','Save and Exit']
     current_option = 0
 
     while True:
@@ -386,7 +387,12 @@ def main_ui(stdscr, controller):
                 program = Program(controller, stdscr)
                 program.start()
                 curses.endwin()
+
             elif current_option == 3:
+                controller.main_ui =False
+                CodeBrowser(controller.config['path']).run()
+                controller.main_ui = True
+            elif current_option == 4:
                 controller.save_json()
                 curses.endwin()
                 break
@@ -410,7 +416,6 @@ def view_settings(stdscr, controller):
             key = stdscr.getkey()
         except curses.error:
             key = ''
-import curses
 
 def edit_settings(stdscr, controller):
     curses.start_color()
@@ -554,7 +559,6 @@ def edit_settings(stdscr, controller):
             current_input += key
 
     curses.curs_set(0)
-
 
 def main():
     controller = Controller()
