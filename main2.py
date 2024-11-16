@@ -1,6 +1,6 @@
 import sys
 import pandas as pd
-from PIL import Image  # Use Pillow for image processing
+from PIL import Image
 from rich.syntax import Syntax
 from rich.traceback import Traceback
 from rich.table import Table
