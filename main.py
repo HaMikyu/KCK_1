@@ -73,15 +73,9 @@ class Controller:
             except:
                 raise Exception("'clock.wav' doesn't exist and can't be downloaded!")
 
-        if not os.path.isfile("main2.py"):
-            try:
-                download_file_from_google_drive("1-xetbjaa1AxXtaBmWxwj1OGy3brb43H0", 'clock.wav')
-            except:
-                raise Exception("'main2.py' doesn't exist and can't be downloaded!")
-
         if not os.path.isfile("code_browser.tcss"):
             try:
-                download_file_from_google_drive("1LY0d7Ry4I6slT2i_PrfKJv4hdjU4NkPb", 'clock.wav')
+                download_file_from_google_drive("1LY0d7Ry4I6slT2i_PrfKJv4hdjU4NkPb", "code_browser.tcss")
             except:
                 raise Exception("'code_browser.tcss' doesn't exist and can't be downloaded!")
 
