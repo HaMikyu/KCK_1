@@ -16,6 +16,9 @@ from unidecode import unidecode
 from timeit import default_timer as timer
 import xlsxwriter
 import requests
+from main2 import CodeBrowser
+
+
 
 def download_file_from_google_drive(file_id, destination):
     URL = "https://drive.google.com/uc?export=download"
@@ -69,6 +72,19 @@ class Controller:
                 download_file_from_google_drive("1xcBbdgl9pfl0ME0Gp7hrlp0rlomCN2TX",'clock.wav')
             except:
                 raise Exception("'clock.wav' doesn't exist and can't be downloaded!")
+
+        if not os.path.isfile("main2.py"):
+            try:
+                download_file_from_google_drive("1-xetbjaa1AxXtaBmWxwj1OGy3brb43H0", 'clock.wav')
+            except:
+                raise Exception("'main2.py' doesn't exist and can't be downloaded!")
+
+        if not os.path.isfile("code_browser.tcss"):
+            try:
+                download_file_from_google_drive("1LY0d7Ry4I6slT2i_PrfKJv4hdjU4NkPb", 'clock.wav')
+            except:
+                raise Exception("'code_browser.tcss' doesn't exist and can't be downloaded!")
+
             #raise FileNotFoundError("I guess you don't have clock.wav?")
 
     def save_json(self):
@@ -348,7 +364,7 @@ def main_ui(stdscr, controller):
     curses.start_color()
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     stdscr.clear()
-    options = ['View Current Settings', 'Edit Settings', 'Start Recording', 'Save and Exit']
+    options = ['View Current Settings', 'Edit Settings', 'Start Recording', 'Search directory','Save and Exit']
     current_option = 0
 
     while True:
@@ -386,7 +402,12 @@ def main_ui(stdscr, controller):
                 program = Program(controller, stdscr)
                 program.start()
                 curses.endwin()
+
             elif current_option == 3:
+                controller.main_ui =False
+                CodeBrowser(controller.config['path']).run()
+                controller.main_ui = True
+            elif current_option == 4:
                 controller.save_json()
                 curses.endwin()
                 break
@@ -410,7 +431,6 @@ def view_settings(stdscr, controller):
             key = stdscr.getkey()
         except curses.error:
             key = ''
-import curses
 
 def edit_settings(stdscr, controller):
     curses.start_color()
@@ -554,7 +574,6 @@ def edit_settings(stdscr, controller):
             current_input += key
 
     curses.curs_set(0)
-
 
 def main():
     controller = Controller()
