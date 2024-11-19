@@ -443,7 +443,6 @@ def edit_settings(stdscr, controller):
 
     def on_press(key):
         nonlocal current_input, editing
-        print(key)
         key_str = format(key)
         key_str = key_str.lower().strip()
 
@@ -452,7 +451,6 @@ def edit_settings(stdscr, controller):
             return
 
         key_str = key_str.replace("'", "")
-        print(key_str)
         if len(key_str) == 3:
             key_str = key_str[1:-1]
         key_str = unidecode(key_str)
